@@ -1258,6 +1258,86 @@ describe("core/graph", () => {
     });
   });
 
+  describe("transform", () => {
+    const nFoo = node("foo");
+    const nBar = node("bar");
+    const nZod = node("zod");
+    const eFooBar = edge("fooBar", nFoo, nBar);
+    it("transforms nodes in a graph", () => {
+      const g = new Graph().addNode(nFoo).addNode(nBar);
+      const transformed = g.transform((na) =>
+        na === nBar.address ? nZod : null
+      );
+      const expected = new Graph().addNode(nFoo).addNode(nZod);
+      expect(transformed.equals(expected)).toBe(true);
+    });
+    it("does not transform the original graph", () => {
+      const g = new Graph().addNode(nFoo);
+      const gCopy = g.copy();
+      const transformed = g.transform((na) =>
+        na === nFoo.address ? nZod : null
+      );
+      expect(g.equals(gCopy)).toBe(true);
+      expect(g.equals(transformed)).toBe(false);
+    });
+    it("transforms edges incident to transformed edges", () => {
+      const g = new Graph()
+        .addNode(nFoo)
+        .addNode(nBar)
+        .addEdge(eFooBar);
+      const transformedEdge = edge("fooBar", nFoo, nZod);
+      const expected = new Graph()
+        .addNode(nFoo)
+        .addNode(nZod)
+        .addEdge(transformedEdge);
+      const transformed = g.transform((na) =>
+        na === nBar.address ? nZod : null
+      );
+      expect(transformed.equals(expected)).toBe(true);
+    });
+    it("works in a case where nodes are collapsed together", () => {
+      const nCombined = node("combined");
+      const e1 = edge("e1", nFoo, nZod);
+      const e1T = edge("e1", nCombined, nZod);
+      const e2 = edge("e2", nZod, nBar);
+      const e2T = edge("e2", nZod, nCombined);
+      const e3 = edge("e3", nZod, nZod);
+      const g = new Graph()
+        .addNode(nFoo)
+        .addNode(nBar)
+        .addNode(nZod)
+        .addEdge(e1)
+        .addEdge(e2)
+        .addEdge(e3);
+      const transform = (na) =>
+        na === nFoo.address || na === nBar.address ? nCombined : null;
+      const gTransformed = g.transform(transform);
+      const expected = new Graph()
+        .addNode(nCombined)
+        .addNode(nZod)
+        .addEdge(e1T)
+        .addEdge(e2T)
+        .addEdge(e3);
+      expect(gTransformed.equals(expected)).toBe(true);
+    });
+    it("replaces dangling edges", () => {
+      const e1 = edge("foo", nFoo, nBar);
+      const g1 = new Graph()
+        .addEdge(e1)
+        .transform((na) => (na === nBar.address ? nZod : null));
+      const e2 = edge("foo", nFoo, nZod);
+      const g2 = new Graph().addEdge(e2);
+      expect(g1.equals(g2)).toBe(true);
+    });
+    it("can leave a graph untouched", () => {
+      const g1 = advancedGraph().graph1();
+      const g2 = advancedGraph()
+        .graph1()
+        .transform((_) => null);
+      expect(g1.equals(g2)).toBe(true);
+    });
+  });
+
   describe("merge", () => {
     const foo = node("foo");
     const bar = node("bar");

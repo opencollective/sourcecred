@@ -777,6 +777,49 @@ export class Graph {
   }
 
   /**
+   * Create a graph that's been transformed via node replacement.
+   *
+   * A node replacer is a function which takes a node address, and returns
+   * either a replacement node, or null if the node should not be replaced.
+   *
+   * `Graph.transform` takes a node replacer, and returns a new Graph, where
+   * every node with a replacement has been replaced, and every edge that references
+   * a replaced node has been rewritten to reference the replacement.
+   *
+   * It does not mutate the original graph in any way; the returned Graph is an independent
+   * copy.
+   *
+   * This method is motivated by the need to transform graphs to collapse different
+   * user identities together. For example, if I contribute to a project on both
+   * Discourse and GitHub, we can use `transform` to make a new graph where all of
+   * my contributions connect to a single, deduplicated identity.
+   *
+   * In the future, we may consider adding an `edgeTransform` argument to allow
+   * specific edge replacements.
+   */
+  transform(nodeTransform: (n: NodeAddressT) => ?Node): Graph {
+    function newEdge(e: Edge): Edge {
+      const {address, src, dst, timestampMs} = e;
+      const newSrcNode = nodeTransform(src);
+      const newDstNode = nodeTransform(dst);
+      return {
+        address,
+        src: newSrcNode ? newSrcNode.address : src,
+        dst: newDstNode ? newDstNode.address : dst,
+        timestampMs,
+      };
+    }
+    const result = new Graph();
+    for (const node of this.nodes()) {
+      result.addNode(nodeTransform(node.address) || node);
+    }
+    for (const edge of this.edges({showDangling: true})) {
+      result.addEdge(newEdge(edge));
+    }
+    return result;
+  }
+
+  /**
    * Serialize a Graph into a plain JavaScript object.
    */
   toJSON(): GraphJSON {
