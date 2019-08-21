@@ -3,6 +3,7 @@
 import type {Database} from "better-sqlite3";
 import stringify from "json-stable-stringify";
 import dedent from "../../util/dedent";
+import type {TaskReporter} from "../../util/taskReporter";
 import {
   type Discourse,
   type TopicId,
@@ -80,6 +81,7 @@ export interface DiscourseData {
 export class Mirror implements DiscourseData {
   +_db: Database;
   +_fetcher: Discourse;
+  +_serverUrl: string;
 
   /**
    * Construct a new Mirror instance.
@@ -94,6 +96,7 @@ export class Mirror implements DiscourseData {
     if (db == null) throw new Error("db: " + String(db));
     this._db = db;
     this._fetcher = fetcher;
+    this._serverUrl = serverUrl;
     if (db.inTransaction) {
       throw new Error("already in transaction");
     }
@@ -256,7 +259,9 @@ export class Mirror implements DiscourseData {
       .get({topic_id: topicId, index_within_topic: indexWithinTopic});
   }
 
-  async update() {
+  async update(reporter: TaskReporter) {
+    const taskId = `discourse/${this._serverUrl}`;
+    reporter.start(taskId);
     const db = this._db;
     const latestTopicId = await this._fetcher.latestTopicId();
     const {max_post: lastLocalPostId, max_topic: lastLocalTopicId} = db
@@ -341,6 +346,7 @@ export class Mirror implements DiscourseData {
       };
     })();
 
+    reporter.start(taskId + "/topics");
     for (
       let topicId = lastLocalTopicId + 1;
       topicId <= latestTopicId;
@@ -355,7 +361,9 @@ export class Mirror implements DiscourseData {
         }
       }
     }
+    reporter.finish(taskId + "/topics");
 
+    reporter.start(taskId + "/posts");
     const latestPosts = await this._fetcher.latestPosts();
     for (const post of latestPosts) {
       if (!encounteredPostIds.has(post.id) && post.id > lastLocalPostId) {
@@ -374,6 +382,7 @@ export class Mirror implements DiscourseData {
         addPost(post);
       }
     }
+    reporter.finish(taskId + "/posts");
 
     // I don't want to hard code the expected page size, in case it changes upstream.
     // However, it's helpful to have a good guess of what the page size is, because if we
@@ -423,6 +432,8 @@ export class Mirror implements DiscourseData {
         return {changed: runResult.changes > 0};
       };
     })();
+
+    reporter.start(taskId + "/likes");
     for (const user of this.users()) {
       let offset = 0;
       let upToDate = false;
@@ -441,5 +452,7 @@ export class Mirror implements DiscourseData {
         offset += likeActions.length;
       }
     }
+    reporter.finish(taskId + "/likes");
+    reporter.finish(taskId);
   }
 }
