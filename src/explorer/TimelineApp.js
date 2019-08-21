@@ -4,11 +4,8 @@ import React from "react";
 import type {Assets} from "../webutil/assets";
 import {TimelineExplorer} from "./TimelineExplorer";
 import {TimelineCred} from "../analysis/timeline/timelineCred";
-import {
-  declaration as githubDeclaration,
-  userNodeType,
-  repoNodeType,
-} from "../plugins/github/declaration";
+import * as Github from "../plugins/github/declaration";
+import * as Discourse from "../plugins/discourse/declaration";
 import {DEFAULT_CRED_CONFIG} from "../plugins/defaultCredConfig";
 import {encodeProjectId, type ProjectId} from "../core/project";
 
@@ -73,9 +70,15 @@ export class TimelineApp extends React.Component<Props, State> {
           <TimelineExplorer
             initialTimelineCred={timelineCred}
             projectId={this.props.projectId}
-            declarations={[githubDeclaration]}
-            defaultNodeType={userNodeType}
-            filterableNodeTypes={[userNodeType, repoNodeType]}
+            declarations={[Github.declaration, Discourse.declaration]}
+            defaultNodeType={Github.userNodeType}
+            filterableNodeTypes={[
+              Github.userNodeType,
+              Github.repoNodeType,
+              Discourse.topicNodeType,
+              Discourse.postNodeType,
+              Discourse.userNodeType,
+            ]}
           />
         );
       }
