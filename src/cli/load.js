@@ -11,7 +11,9 @@ import {load} from "../api/load";
 import {specToProject} from "../plugins/github/specToProject";
 import fs from "fs-extra";
 import {partialParams} from "../analysis/timeline/params";
-import {DEFAULT_PLUGINS} from "./defaultPlugins";
+import {type PluginDeclaration} from "../analysis/pluginDeclaration";
+import {declaration as discourseDeclaration} from "../plugins/discourse/declaration";
+import {declaration as githubDeclaration} from "../plugins/github/declaration";
 
 function usage(print: (string) => void): void {
   print(
@@ -121,15 +123,23 @@ const loadCommand: Command = async (args, std) => {
   const params = partialParams({weights});
   const manualProjects = await Promise.all(projectPaths.map(loadProject));
   const projects = specProjects.concat(manualProjects);
-  const plugins = DEFAULT_PLUGINS;
-  const optionses = projects.map((project) => ({
-    project,
-    params,
-    plugins,
-    sourcecredDirectory: Common.sourcecredDirectory(),
-    githubToken,
-    discourseKey: Common.discourseKey(),
-  }));
+  const optionses = projects.map((project) => {
+    const plugins: PluginDeclaration[] = [];
+    if (project.discourseServer != null) {
+      plugins.push(discourseDeclaration);
+    }
+    if (project.repoIds.length) {
+      plugins.push(githubDeclaration);
+    }
+    return {
+      project,
+      params,
+      plugins,
+      sourcecredDirectory: Common.sourcecredDirectory(),
+      githubToken,
+      discourseKey: Common.discourseKey(),
+    };
+  });
   // Deliberately load in serial because GitHub requests that their API not
   // be called concurrently
   for (const options of optionses) {
