@@ -10,6 +10,8 @@ orbs:
   docker: circleci/docker@0.5.13
 
 executors:
+  # Explicit executor, from docker orb.
+  docker-host: docker/machine
   node10:
     docker:
       - image: circleci/node:10
@@ -65,6 +67,7 @@ workflows:
     jobs:
       - test
       - docker/publish:
+          executor: docker-host
           deploy: false
           image: sourcecred/sourcecred
           tag: latest
@@ -85,6 +88,7 @@ workflows:
                    echo "Version that would be used for Docker tag is ${DOCKER_TAG}"
 
       - docker/publish:
+          executor: docker-host
           image: sourcecred/sourcecred
           tag: latest
           requires:
@@ -121,6 +125,7 @@ workflows:
                 - /ci-.*/
 
       - docker/publish:
+          executor: docker-host
           image: sourcecred/sourcecred
           extra_build_args: --cache-from=node:12,sourcecred/sourcecred:dev
           before_build:
